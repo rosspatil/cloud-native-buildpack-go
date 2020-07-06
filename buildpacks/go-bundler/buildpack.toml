@@ -1,0 +1,14 @@
+# Buildpack API version
+api = "0.2"
+
+# Buildpack ID and metadata
+[buildpack]
+id = "go-bundler"
+version = "0.0.1"
+name = "Golang Buildpack"
+
+# Stacks that the buildpack will work with
+
+[[stacks]]
+id = "io.buildpacks.stack.golang.alpine"
+#mixins = ["build:set=shell-utils"]

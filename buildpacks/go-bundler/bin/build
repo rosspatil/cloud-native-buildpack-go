@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+echo "---> Go Buildpack"
+
+# 1. GET ARGS
+layers_dir=$1
+plan_path=$3
+
+go_root=$(go version  || echo 'not found')
+go_version=$(cat "${plan_path}" | yj -t | jq -r '.entries[] | select(.name == "go") | .version')
+
+if [[ ${go_root} == 'not found' || ${go_version} != $(cat {$go_root} | grep -o '1.[0-9]*.[0-9]*') ]] ; then 
+  go_layer_dir="${layers_dir}/go"
+  mkdir -p "${go_layer_dir}"
+  echo "---> Downloading and extracting go ${go_version}"
+  go_url=https://dl.google.com/go/go${go_version}.linux-amd64.tar.gz
+  wget -q -O - "${go_url}" | tar -xzf - -C "${layers_dir}"
+  cat > "${go_layer_dir}.toml" <<EOL
+  cache = true
+  launch = true
+  metadata = "${go_version}"
+EOL
+
+  export PATH="${go_layer_dir}/bin:${PATH}"
+fi
+
+
+
+
+# Compares previous go.sum checksum to the current go.sum
+bundler_layer_dir="${layers_dir}/bundler"
+local_bundler_checksum=$(sha256sum go.sum | cut -d ' ' -f 1) 
+remote_bundler_checksum=$(cat "${bundler_layer_dir}.toml" | yj -t | jq -r .metadata 2>/dev/null || echo 'not found')
+
+if [[ -f go.sum && ${local_bundler_checksum} == ${remote_bundler_checksum} ]] ; then
+  # Determine if no gem dependencies have changed, so it can reuse existing gems without running bundle install
+  echo "---> Reusing dependencies"
+else
+  # Determine if there has been a gem dependency change and install new gems to the bundler layer; re-using existing and un-changed gems
+  echo "---> Installing go dependencies"
+  mkdir "${bundler_layer_dir}"
+  cat > "${bundler_layer_dir}.toml" <<EOL
+cache = true
+launch = true
+metadata = "${local_bundler_checksum}"
+EOL
+echo "-----> download dependencies"
+go mod download
+fi
+
+echo "-----> build main"
+go build -o main
+
+# 7. SET DEFAULT START COMMAND
+cat >> "${layers_dir}/launch.toml" <<EOL
+[[processes]]
+type = "web"
+command = "./main"
+EOL

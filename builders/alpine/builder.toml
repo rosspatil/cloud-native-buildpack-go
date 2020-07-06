@@ -1,0 +1,17 @@
+# Buildpacks to include in builder
+[[buildpacks]]
+id = "go-bundler"
+version = "0.0.1"
+uri = "../../buildpacks/go-bundler"
+
+# Order used for detection
+[[order]]
+[[order.group]]
+id = "go-bundler"
+version = "0.0.1"
+
+# Stack that will be used by the builder
+[stack]
+id = "io.buildpacks.stack.golang.alpine"
+build-image = "roshanpatil/cnb-base-image:alpine"
+run-image = "roshanpatil/cnb-base-image:alpine"
